@@ -1,0 +1,10 @@
+# dotenv environment variables file
+.env
+.env.test
+.env.*
+
+# virtualenv
+.python-version
+
+# audio files
+*.wav

@@ -1,0 +1,7 @@
+pvporcupine
+pvcobra
+pyaudio
+openai
+wave
+python-dotenv
+elevenlabslib
