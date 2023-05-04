@@ -8,6 +8,9 @@ import wave
 import os
 from dotenv import load_dotenv
 from elevenlabslib import *
+from pymilvus import Milvus, DataType
+from sentence_transformers import SentenceTransformer
+
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -18,6 +21,30 @@ MAX_RECORD_SECONDS = 5  # Maximum recording duration in seconds
 PICOVOICE_API_KEY = os.environ.get('PICOVOICE_API_KEY')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 ELEVENLABS_API_KEY = os.environ.get('ELEVENLABS_API_KEY')
+MILVUS_HOST = os.environ.get('MILVUS_HOST')
+MILVUS_PORT = os.environ.get('MILVUS_PORT')
+
+# Prepare Milvus for long-term storage
+milvus = Milvus(host=MILVUS_HOST, port=MILVUS_PORT)
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Define schema of the collection
+schema = {
+    "fields": [
+        {"name": "prompt", "type": DataType.STRING},
+        {"name": "response", "type": DataType.STRING},
+        {"name": "response_vector", "type": DataType.FLOAT_VECTOR,
+            "params": {"dim": 768}},
+        {"name": "prompt_vector", "type": DataType.FLOAT_VECTOR, "params": {"dim": 768}},
+    ],
+    "segment_row_limit": 10000,
+    "auto_id": True
+}
+
+collection_name = 'chat_history'
+
+if not milvus.has_collection(collection_name):
+    milvus.create_collection(collection_name, schema)
 
 # Create Porcupine instance
 porcupine = pvporcupine.create(
@@ -130,6 +157,31 @@ def synthesize_and_play_audio(text):
             historyItem.delete()
             break
 
+# Parse Commands
+
+
+def parseCommand(text):
+    commands = ["Persona", "Help", "Quit", "Start"]
+    match text:
+        case "Help.":
+            synthesize_and_play_audio(
+                "Available commands are: Persona, Help, Quit, Start")
+        case "Persona.":
+            return
+        case "Quit.":
+            return
+        case "Start.":
+            synthesize_and_play_audio(
+                "Please give a name for the project you want to create.")
+            record_audio()
+            text = transcribe_audio()
+            text.replace(" ", "_")
+            text.replace(".", "")
+            text.replace("?", "")
+            collection_name = text
+            if not milvus.has_collection(collection_name):
+                milvus.create_collection(collection_name, schema)
+
 
 try:
     print("Listening for wake word '{}'...".format(WAKE_WORD))
@@ -150,6 +202,7 @@ try:
             if text == 'Quit.':
                 break
 
+            parseCommand(text)
             # Send transcribed text to ChatGPT API
             response_text = send_to_chatgpt(text)
 
@@ -181,3 +234,4 @@ finally:
     pa.terminate()
     porcupine.delete()
     cobra.delete()
+    milvus.close()
