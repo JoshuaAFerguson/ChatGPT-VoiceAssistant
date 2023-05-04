@@ -8,3 +8,9 @@
 
 # audio files
 *.wav
+
+# python venv
+venv
+
+*.txt
+*.json
