@@ -5,3 +5,5 @@ openai
 wave
 python-dotenv
 elevenlabslib
+pymilvus
+sentence-transformers
